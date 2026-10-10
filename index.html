@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Housie / House Number Picker - Live Online Sync</title>
+    
+    <!-- Firebase App & Realtime Database CDN scripts -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+    
+    <!-- Load your separate config file -->
+    <script src="config.js"></script>
+    
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --success: #10b981;
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+            background: var(--card-bg);
+            padding: 25px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            margin: 0 0 5px 0;
+            font-size: 26px;
+            color: #ffffff;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin: 0;
+        }
+
+        .board-section {
+            margin-bottom: 25px;
+        }
+
+        .board-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 5px;
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #334155;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+        }
+
+        .cell.called {
+            background: var(--success);
+            color: white;
+            font-weight: bold;
+            transform: scale(1.05);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+        }
+
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1.2fr 1.8fr;
+            gap: 20px;
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+        }
+
+        .current-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #1e293b;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #334155;
+        }
+
+        .current-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+
+        #currentNumber {
+            font-size: 56px;
+            font-weight: 900;
+            color: #818cf8;
+            line-height: 1.1;
+            margin: 5px 0;
+        }
+
+        .actions-box {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn-group-timers {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .timer-btn {
+            background-color: #334155;
+            font-size: 12px;
+            padding: 8px 4px;
+        }
+
+        .timer-btn.active {
+            background-color: var(--success);
+        }
+
+        .btn-manual {
+            background-color: #6366f1;
+            font-size: 15px;
+            padding: 12px;
+        }
+
+        .btn-reset {
+            background-color: #475569;
+        }
+
+        .status-bar {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Housie / Tambola Live Caller</h1>
+            <p class="subtitle">Long-Distance Multiplayer Sync Board</p>
+        </header>
+
+        <div class="board-section">
+            <div class="board-title">Master Board Status (<span id="count">0</span> / 90 Called)</div>
+            <div class="board" id="board"></div>
+        </div>
+
+        <div class="control-panel">
+            <div class="current-display">
+                <span class="current-label">Latest Number</span>
+                <div id="currentNumber">-</div>
+                <div style="font-size: 11px; color: #64748b; margin-top: 5px;">🔊 Audio Enabled</div>
+            </div>
+
+            <div class="actions-box">
+                <button class="btn btn-manual" onclick="pickNumber()">Pick Number Manually</button>
+                
+                <div style="font-size: 12px; color: var(--text-muted); margin-bottom: -4px;">Select Auto-Pick Interval:</div>
+                <div class="btn-group-timers">
+                    <button class="btn timer-btn" id="t-3" onclick="setAutoInterval(3)">3s</button>
+                    <button class="btn timer-btn" id="t-5" onclick="setAutoInterval(5)">5s</button>
+                    <button class="btn timer-btn" id="t-8" onclick="setAutoInterval(8)">8s</button>
+                    <button class="btn timer-btn" id="t-10" onclick="setAutoInterval(10)">10s</button>
+                </div>
+                
+                <button class="btn btn-reset" onclick="resetGame()">Reset Board</button>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            Sync Status: <span id="syncStatus" style="color: var(--success);">Connecting to Firebase...</span>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Firebase using the config loaded from config.js
+        firebase.initializeApp(firebaseConfig);
+        const dbRef = firebase.database().ref('game_state');
+
+        let autoTimer = null;
+        let activeIntervalSeconds = 0;
+        let lastAnnouncedNum = null;
+
+        // Build 1 to 90 Board UI
+        const boardElement = document.getElementById('board');
+        for (let i = 1; i <= 90; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.id = `cell-${i}`;
+            cell.textContent = i;
+            boardElement.appendChild(cell);
+        }
+
+        // Listen for real-time changes from Firebase across all devices
+        dbRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                updateUIState(data.calledNumbers || [], data.currentNumber || '-');
+                document.getElementById('syncStatus').textContent = "Connected (Live Real-Time Sync Active)";
+                document.getElementById('syncStatus').style.color = "#10b981";
+            } else {
+                updateUIState([], '-');
+            }
+        }, (error) => {
+            document.getElementById('syncStatus').textContent = "Connection Error (Check Database Rules)";
+            document.getElementById('syncStatus').style.color = "#ef4444";
+        });
+
+        function updateUIState(calledList, currentNum) {
+            // Reset grid
+            for (let i = 1; i <= 90; i++) {
+                const cell = document.getElementById(`cell-${i}`);
+                cell.classList.remove('called');
+            }
+
+            // Highlight called numbers
+            calledList.forEach(num => {
+                const cell = document.getElementById(`cell-${num}`);
+                if (cell) cell.classList.add('called');
+            });
+
+            document.getElementById('currentNumber').textContent = currentNum;
+            document.getElementById('count').textContent = calledList.length;
+
+            // Audio notification when a new number is broadcasted
+            if (currentNum !== '-' && currentNum !== lastAnnouncedNum) {
+                speakNumber(currentNum);
+                lastAnnouncedNum = currentNum;
+            }
+        }
+
+        function pickNumber() {
+            dbRef.once('value', (snapshot) => {
+                const data = snapshot.val() || {};
+                let called = data.calledNumbers || [];
+
+                if (called.length >= 90) {
+                    alert("All 90 numbers have been finished!");
+                    stopAuto();
+                    return;
+                }
+
+                let available = Array.from({length: 90}, (_, i) => i + 1).filter(n => !called.includes(n));
+                let picked = available[Math.floor(Math.random() * available.length)];
+
+                called.push(picked);
+
+                // Push update to Firebase database -> instantly syncs to all connected players!
+                dbRef.set({
+                    calledNumbers: called,
+                    currentNumber: picked
+                });
+            });
+        }
+
+        function speakNumber(num) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(`Number ${num}`);
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function setAutoInterval(seconds) {
+            if (activeIntervalSeconds === seconds) {
+                stopAuto();
+                return;
+            }
+
+            stopAuto();
+            activeIntervalSeconds = seconds;
+            
+            document.querySelectorAll('.timer-btn').forEach(btn => btn.classList.remove('active'));
+            const targetBtn = document.getElementById(`t-${seconds}`);
+            if (targetBtn) targetBtn.classList.add('active');
+
+            pickNumber();
+            autoTimer = setInterval(() => {
+                dbRef.once('value', (snapshot) => {
+                    const data = snapshot.val() || {};
+                    if ((data.calledNumbers || []).length >= 90) {
+                        stopAuto();
+                        return;
+                    }
+                    pickNumber();
+                });
+            }, seconds * 1000);
+        }
+
+        function stopAuto() {
+            activeIntervalSeconds = 0;
+            if (autoTimer) {
+                clearInterval(autoTimer);
+                autoTimer = null;
+            }
+            document.querySelectorAll('.timer-btn').forEach(btn => btn.classList.remove('active'));
+        }
+
+        function resetGame() {
+            if (confirm("Are you sure you want to reset the board for all players?")) {
+                stopAuto();
+                dbRef.set({
+                    calledNumbers: [],
+                    currentNumber: '-'
+                });
+            }
+        }
+    </script>
+</body>
+</html>
